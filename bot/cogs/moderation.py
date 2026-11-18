@@ -1,4 +1,4 @@
-"""Moderation: Verwarnungen (in MariaDB), Kick, Timeout, Purge."""
+"""Moderation: warnings (stored in MariaDB), kick, timeout, purge."""
 from __future__ import annotations
 
 from datetime import timedelta, timezone
@@ -12,6 +12,8 @@ from utils.helpers import can_moderate, send_log
 
 if TYPE_CHECKING:
     from main import PelicanBot
+
+NO_REASON = "No reason given"
 
 
 class Moderation(commands.Cog):
@@ -30,18 +32,18 @@ class Moderation(commands.Cog):
         try:
             await member.send(text)
         except discord.HTTPException:
-            pass  # DMs deaktiviert
+            pass  # DMs disabled
 
-    @app_commands.command(name="warn", description="Verwarnt ein Mitglied")
+    @app_commands.command(name="warn", description="Warns a member")
     @app_commands.guild_only()
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.checks.has_permissions(moderate_members=True)
-    @app_commands.describe(member="Mitglied", reason="Grund der Verwarnung")
+    @app_commands.describe(member="Member to warn", reason="Reason for the warning")
     async def warn(
         self, interaction: discord.Interaction, member: discord.Member, reason: app_commands.Range[str, 1, 500]
     ) -> None:
         if member.bot:
-            await interaction.response.send_message("Bots können nicht verwarnt werden.", ephemeral=True)
+            await interaction.response.send_message("Bots can't be warned.", ephemeral=True)
             return
         if not await self._check_target(interaction, member):
             return
@@ -57,19 +59,20 @@ class Moderation(commands.Cog):
             "SELECT COUNT(*) AS n FROM warnings WHERE guild_id = %s AND user_id = %s", interaction.guild_id, member.id
         )
 
-        embed = discord.Embed(title=f"⚠️ Verwarnung #{warn_id}", color=discord.Color.orange())
-        embed.add_field(name="Mitglied", value=member.mention)
+        embed = discord.Embed(title=f"⚠️ Warning #{warn_id}", color=discord.Color.orange())
+        embed.add_field(name="Member", value=member.mention)
         embed.add_field(name="Moderator", value=interaction.user.mention)
-        embed.add_field(name="Verwarnungen gesamt", value=str(count["n"]))
-        embed.add_field(name="Grund", value=reason, inline=False)
+        embed.add_field(name="Total warnings", value=str(count["n"]))
+        embed.add_field(name="Reason", value=reason, inline=False)
         await interaction.response.send_message(embed=embed)
         await send_log(self.bot, interaction.guild, embed)
-        await self._dm(member, f"⚠️ Du wurdest auf **{interaction.guild.name}** verwarnt: {reason}")
+        await self._dm(member, f"⚠️ You have been warned on **{interaction.guild.name}**: {reason}")
 
-    @app_commands.command(name="warnings", description="Zeigt die Verwarnungen eines Mitglieds")
+    @app_commands.command(name="warnings", description="Shows the warnings of a member")
     @app_commands.guild_only()
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.checks.has_permissions(moderate_members=True)
+    @app_commands.describe(member="Member to look up")
     async def warnings(self, interaction: discord.Interaction, member: discord.Member) -> None:
         rows = await self.bot.db.fetchall(
             "SELECT id, moderator_id, reason, created_at FROM warnings "
@@ -78,7 +81,7 @@ class Moderation(commands.Cog):
             member.id,
         )
         if not rows:
-            await interaction.response.send_message(f"✅ {member.display_name} hat keine Verwarnungen.", ephemeral=True)
+            await interaction.response.send_message(f"✅ {member.display_name} has no warnings.", ephemeral=True)
             return
         lines = [
             f"**#{r['id']}** · <@{r['moderator_id']}> · "
@@ -86,47 +89,53 @@ class Moderation(commands.Cog):
             for r in rows
         ]
         embed = discord.Embed(
-            title=f"Verwarnungen von {member.display_name}", description="\n\n".join(lines), color=discord.Color.orange()
+            title=f"Warnings for {member.display_name}", description="\n\n".join(lines), color=discord.Color.orange()
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="clearwarnings", description="Löscht alle Verwarnungen eines Mitglieds")
+    @app_commands.command(name="clearwarnings", description="Deletes all warnings of a member")
     @app_commands.guild_only()
     @app_commands.default_permissions(administrator=True)
     @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.describe(member="Member whose warnings will be deleted")
     async def clearwarnings(self, interaction: discord.Interaction, member: discord.Member) -> None:
         deleted = await self.bot.db.execute(
             "DELETE FROM warnings WHERE guild_id = %s AND user_id = %s", interaction.guild_id, member.id
         )
-        await interaction.response.send_message(f"🧹 {deleted} Verwarnung(en) von {member.mention} gelöscht.", ephemeral=True)
+        await interaction.response.send_message(f"🧹 Deleted {deleted} warning(s) of {member.mention}.", ephemeral=True)
 
-    @app_commands.command(name="kick", description="Kickt ein Mitglied vom Server")
+    @app_commands.command(name="kick", description="Kicks a member from the server")
     @app_commands.guild_only()
     @app_commands.default_permissions(kick_members=True)
     @app_commands.checks.has_permissions(kick_members=True)
     @app_commands.checks.bot_has_permissions(kick_members=True)
+    @app_commands.describe(member="Member to kick", reason="Reason for the kick")
     async def kick(
         self, interaction: discord.Interaction, member: discord.Member, reason: Optional[app_commands.Range[str, 1, 400]] = None
     ) -> None:
         if not await self._check_target(interaction, member):
             return
-        reason = reason or "Kein Grund angegeben"
-        await self._dm(member, f"👢 Du wurdest von **{interaction.guild.name}** gekickt: {reason}")
+        reason = reason or NO_REASON
+        await self._dm(member, f"👢 You have been kicked from **{interaction.guild.name}**: {reason}")
         await member.kick(reason=f"{interaction.user} – {reason}")
 
-        embed = discord.Embed(title="👢 Mitglied gekickt", color=discord.Color.red())
-        embed.add_field(name="Mitglied", value=str(member))
+        embed = discord.Embed(title="👢 Member kicked", color=discord.Color.red())
+        embed.add_field(name="Member", value=str(member))
         embed.add_field(name="Moderator", value=interaction.user.mention)
-        embed.add_field(name="Grund", value=reason, inline=False)
+        embed.add_field(name="Reason", value=reason, inline=False)
         await interaction.response.send_message(embed=embed)
         await send_log(self.bot, interaction.guild, embed)
 
-    @app_commands.command(name="timeout", description="Schaltet ein Mitglied für X Minuten stumm")
+    @app_commands.command(name="timeout", description="Times out a member for X minutes")
     @app_commands.guild_only()
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.checks.has_permissions(moderate_members=True)
     @app_commands.checks.bot_has_permissions(moderate_members=True)
-    @app_commands.describe(minutes="Dauer in Minuten (max. 28 Tage), 0 hebt den Timeout auf")
+    @app_commands.describe(
+        member="Member to time out",
+        minutes="Duration in minutes (max. 28 days), 0 removes the timeout",
+        reason="Reason for the timeout",
+    )
     async def timeout(
         self,
         interaction: discord.Interaction,
@@ -136,26 +145,26 @@ class Moderation(commands.Cog):
     ) -> None:
         if not await self._check_target(interaction, member):
             return
-        reason = reason or "Kein Grund angegeben"
+        reason = reason or NO_REASON
         if minutes == 0:
             await member.timeout(None, reason=f"{interaction.user} – {reason}")
-            await interaction.response.send_message(f"🔊 Timeout von {member.mention} aufgehoben.")
+            await interaction.response.send_message(f"🔊 Removed the timeout of {member.mention}.")
             return
 
         await member.timeout(timedelta(minutes=minutes), reason=f"{interaction.user} – {reason}")
         embed = discord.Embed(title="🔇 Timeout", color=discord.Color.dark_orange())
-        embed.add_field(name="Mitglied", value=member.mention)
-        embed.add_field(name="Dauer", value=f"{minutes} Minuten")
-        embed.add_field(name="Grund", value=reason, inline=False)
+        embed.add_field(name="Member", value=member.mention)
+        embed.add_field(name="Duration", value=f"{minutes} minute(s)")
+        embed.add_field(name="Reason", value=reason, inline=False)
         await interaction.response.send_message(embed=embed)
         await send_log(self.bot, interaction.guild, embed)
 
-    @app_commands.command(name="purge", description="Löscht die letzten N Nachrichten in diesem Kanal")
+    @app_commands.command(name="purge", description="Deletes the last N messages in this channel")
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_messages=True)
     @app_commands.checks.has_permissions(manage_messages=True)
     @app_commands.checks.bot_has_permissions(manage_messages=True, read_message_history=True)
-    @app_commands.describe(amount="Anzahl (1–100)", member="Nur Nachrichten dieses Mitglieds löschen")
+    @app_commands.describe(amount="Number of messages (1–100)", member="Only delete messages from this member")
     async def purge(
         self,
         interaction: discord.Interaction,
@@ -164,12 +173,12 @@ class Moderation(commands.Cog):
     ) -> None:
         channel = interaction.channel
         if not isinstance(channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
-            await interaction.response.send_message("Hier kann ich keine Nachrichten löschen.", ephemeral=True)
+            await interaction.response.send_message("I can't delete messages here.", ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
         check = (lambda m: m.author == member) if member else (lambda m: True)
         deleted = await channel.purge(limit=amount, check=check)
-        await interaction.followup.send(f"🧹 {len(deleted)} Nachricht(en) gelöscht.", ephemeral=True)
+        await interaction.followup.send(f"🧹 Deleted {len(deleted)} message(s).", ephemeral=True)
 
 
 async def setup(bot: "PelicanBot") -> None:

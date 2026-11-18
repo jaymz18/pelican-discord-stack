@@ -97,25 +97,48 @@ Nach der Installation liegt der Code auf dem Server in `bot/` und `website/`.
 
 1. Im [Discord Developer Portal](https://discord.com/developers/applications) eine Anwendung erstellen und unter **Bot** den Token kopieren.
 2. Unter **Privileged Gateway Intents** den **Server Members Intent** und den **Message Content Intent** aktivieren.
-3. Den Bot über **OAuth2 → URL Generator** einladen. Scopes: `bot` und `applications.commands`. Berechtigungen: *Send Messages*, *Embed Links*, *Add Reactions*, *Read Message History*, *Manage Messages*, *Kick Members* und *Moderate Members*.
+3. Den Bot über **OAuth2 → URL Generator** einladen. Scopes: `bot` und `applications.commands`. Berechtigungen: *Send Messages*, *Embed Links*, *Add Reactions*, *Read Message History*, *Manage Messages*, *Kick Members*, *Moderate Members* und *Manage Roles* (für Level-Belohnungen). Die Bot-Rolle muss über den Belohnungsrollen stehen.
+
+Alle Befehle, Antworten und Logs des Bots sind auf **Englisch**.
 
 ### Commands
 
 | Kategorie | Befehle |
 |---|---|
-| Allgemein (Slash **und** Prefix, z. B. `!ping`) | `/ping`, `/help`, `/serverinfo`, `/userinfo`, `/avatar`, `/botinfo` |
-| Level-System | `/rank`, `/leaderboard` |
+| General (Slash **und** Prefix, z. B. `!ping`) | `/ping`, `/help`, `/serverinfo`, `/userinfo`, `/avatar`, `/botinfo` |
+| Leveling | `/rank`, `/leaderboard [page]`, `/rewards` |
+| Leveling – Admin (*Manage Server*) | `/xp give`, `/xp take`, `/xp set`, `/xp reset` |
+| Leveling – Einstellungen (*Manage Server*) | `/levelconfig show`, `announcements`, `channel`, `message`, `multiplier`, `voice-xp`, `ignore`, `unignore`, `reward-add`, `reward-remove`, `reset-all` |
 | Moderation | `/warn`, `/warnings`, `/clearwarnings`, `/kick`, `/timeout`, `/purge` |
 | Fun | `/roll`, `/coinflip`, `/8ball`, `/poll` |
-| Einstellungen | `/setup welcome`, `/setup welcome-message`, `/setup logs`, `/setup disable`, `/setup show` |
+| Settings | `/setup welcome`, `/setup welcome-message`, `/setup logs`, `/setup disable`, `/setup show` |
+
+### Level-System
+
+- **Nachrichten-XP:** 15–25 XP pro Nachricht, höchstens einmal pro 60 s je Mitglied.
+- **Voice-XP:** 10 XP pro Minute in einem Sprachkanal. Voraussetzung: mindestens zwei Personen im Kanal, nicht stummgeschaltet und nicht im AFK-Kanal.
+- **Multiplikator:** Beide XP-Arten lassen sich pro Server mit `/levelconfig multiplier` (×0,1 bis ×5) skalieren.
+- **Level-Kurve:** Level *L* wird bei 100 · *L*² XP erreicht. Die Website rechnet mit derselben Formel.
+- **Rollen-Belohnungen:**
+  - Mit `/levelconfig reward-add <level> <role>` legst du fest, welche Rolle es ab welchem Level gibt.
+  - Rollen werden beim Level-Up vergeben und bei XP-Abzug wieder entfernt.
+  - Wer den Server verlässt und zurückkommt, erhält seine Rollen zurück.
+- **Level-Up-Nachrichten:**
+  - Ein- und ausschaltbar, mit eigenem Kanal und eigenem Text (Platzhalter `{user}`, `{level}` und `{server}`).
+  - Neu erhaltene Rollen werden in der Nachricht genannt.
+- **Kanäle ohne XP:** `/levelconfig ignore <channel>` gilt für Text- und Sprachkanäle.
+- **Admin-Befehle:**
+  - `/xp give|take|set|reset` ändert die XP einzelner Mitglieder.
+  - `/levelconfig reset-all` setzt alle Mitglieder zurück, nach einer Bestätigung per Button.
 
 ### Events
 
 | Event | Funktion |
 |---|---|
 | `on_ready` | Server in der DB registrieren, Status setzen |
-| `on_message` | XP vergeben (Cooldown 60 s) und Level-Up melden |
-| `on_member_join` / `on_member_remove` | Willkommensnachricht, Log-Eintrag, Join/Leave-Statistik |
+| `on_message` | Nachrichten-XP vergeben (Cooldown 60 s), Level-Up melden, Rollen-Belohnungen vergeben |
+| Voice-XP (jede Minute) | XP für aktive Mitglieder in Sprachkanälen |
+| `on_member_join` / `on_member_remove` | Willkommensnachricht, Log-Eintrag, Join/Leave-Statistik, Level-Rollen bei Wiederbeitritt |
 | `on_message_delete` / `on_message_edit` | Log-Kanal |
 | `on_guild_join` / `on_guild_remove` / `on_guild_update` | Server-Liste in der DB pflegen |
 | `on_app_command_completion` / `on_command_completion` | Nutzungsstatistik der Commands |
@@ -132,7 +155,7 @@ Eine öffentliche JSON-API gibt es nicht.
 
 ## Datenbank
 
-Das Schema steht in [`bot/schema.sql`](bot/schema.sql). Es enthält die Tabellen `guilds`, `levels`, `warnings`, `command_log`, `member_events`, `bot_status` und `bot_commands`. Der Bot legt sie beim Start automatisch an (`CREATE TABLE IF NOT EXISTS`). Alle Zeitstempel werden in UTC gespeichert. Die Website rechnet sie in `SITE_TIMEZONE` um.
+Das Schema steht in [`bot/schema.sql`](bot/schema.sql). Es enthält die Tabellen `guilds`, `levels`, `warnings`, `command_log`, `member_events`, `bot_status`, `bot_commands`, `level_settings`, `level_rewards` und `level_ignored_channels`. Neue Spalten in bestehenden Installationen werden beim Start automatisch ergänzt. Der Bot legt sie beim Start automatisch an (`CREATE TABLE IF NOT EXISTS`). Alle Zeitstempel werden in UTC gespeichert. Die Website rechnet sie in `SITE_TIMEZONE` um.
 
 ## Lokale Entwicklung
 

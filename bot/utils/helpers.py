@@ -1,4 +1,4 @@
-"""Gemeinsame Hilfsfunktionen für die Cogs."""
+"""Shared helper functions for the cogs."""
 from __future__ import annotations
 
 import logging
@@ -14,7 +14,7 @@ log = logging.getLogger("bot.helpers")
 
 
 def level_for_xp(xp: int) -> int:
-    """Level-Kurve: Level L wird bei 100 * L² XP erreicht."""
+    """Level curve: level L is reached at 100 * L² XP (same formula as the website)."""
     return int(math.sqrt(max(xp, 0) / 100))
 
 
@@ -43,11 +43,11 @@ async def upsert_guild(bot: "PelicanBot", guild: discord.Guild) -> None:
 
 
 async def send_log(bot: "PelicanBot", guild: discord.Guild, embed: discord.Embed) -> None:
-    """Sendet ein Embed in den konfigurierten Log-Kanal (falls gesetzt)."""
+    """Sends an embed to the configured log channel (if any)."""
     try:
         row = await bot.db.fetchone("SELECT log_channel_id FROM guilds WHERE guild_id = %s", guild.id)
     except Exception:  # noqa: BLE001
-        log.exception("Log-Kanal konnte nicht gelesen werden")
+        log.exception("Could not read log channel")
         return
     if not row or not row["log_channel_id"]:
         return
@@ -56,18 +56,18 @@ async def send_log(bot: "PelicanBot", guild: discord.Guild, embed: discord.Embed
         try:
             await channel.send(embed=embed)
         except discord.HTTPException as exc:
-            log.warning("Log-Nachricht in %s fehlgeschlagen: %s", guild.name, exc)
+            log.warning("Failed to send log message in %s: %s", guild.name, exc)
 
 
 def can_moderate(actor: discord.Member, target: discord.Member) -> str | None:
-    """Prüft die Rollen-Hierarchie. Gibt eine Fehlermeldung zurück oder None."""
+    """Checks the role hierarchy. Returns an error message or None."""
     guild = target.guild
     if target == actor:
-        return "Du kannst dich nicht selbst moderieren."
+        return "You can't moderate yourself."
     if target == guild.owner:
-        return "Der Server-Owner kann nicht moderiert werden."
+        return "The server owner can't be moderated."
     if actor != guild.owner and target.top_role >= actor.top_role:
-        return "Dieses Mitglied hat eine gleich hohe oder höhere Rolle als du."
+        return "This member has an equal or higher role than you."
     if target.top_role >= guild.me.top_role:
-        return "Meine Rolle ist nicht hoch genug, um dieses Mitglied zu moderieren."
+        return "My role isn't high enough to moderate this member."
     return None

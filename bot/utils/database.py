@@ -1,4 +1,4 @@
-"""Asynchrone MariaDB-Anbindung (aiomysql) mit Connection-Pool."""
+"""Async MariaDB access (aiomysql) with a connection pool."""
 from __future__ import annotations
 
 import asyncio
@@ -51,23 +51,23 @@ class Database:
                     minsize=1,
                     maxsize=5,
                     pool_recycle=3600,
-                    # Alle Zeitstempel in UTC speichern – die Website rechnet in die Zeitzone um.
+                    # Store all timestamps in UTC – the website converts them to its time zone.
                     init_command="SET time_zone = '+00:00'",
                 )
-                log.info("Mit MariaDB verbunden (%s:%s/%s)", self.host, self.port, self.database)
+                log.info("Connected to MariaDB (%s:%s/%s)", self.host, self.port, self.database)
                 return
-            except Exception as exc:  # noqa: BLE001 – Verbindungsfehler sind vielfältig
+            except Exception as exc:  # noqa: BLE001 – connection errors come in many shapes
                 last_exc = exc
-                log.warning("DB-Verbindung fehlgeschlagen (Versuch %d/%d): %s", attempt, retries, exc)
+                log.warning("Database connection failed (attempt %d/%d): %s", attempt, retries, exc)
                 await asyncio.sleep(delay)
-        raise RuntimeError("Keine Verbindung zur MariaDB möglich") from last_exc
+        raise RuntimeError("Could not connect to MariaDB") from last_exc
 
     async def init_schema(self) -> None:
         lines = [ln for ln in SCHEMA_FILE.read_text(encoding="utf-8").splitlines() if not ln.strip().startswith("--")]
         statements = [s.strip() for s in "\n".join(lines).split(";") if s.strip()]
         for statement in statements:
             await self.execute(statement)
-        log.info("Datenbankschema geprüft (%d Tabellen)", len(statements))
+        log.info("Database schema checked (%d statements)", len(statements))
 
     async def close(self) -> None:
         if self.pool is not None:
@@ -77,18 +77,18 @@ class Database:
 
     def _require_pool(self) -> aiomysql.Pool:
         if self.pool is None:
-            raise RuntimeError("Datenbank ist nicht verbunden")
+            raise RuntimeError("Database is not connected")
         return self.pool
 
     async def execute(self, query: str, *args: Any) -> int:
-        """Führt eine Schreib-Query aus und gibt die Anzahl betroffener Zeilen zurück."""
+        """Runs a write query and returns the number of affected rows."""
         async with self._require_pool().acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(query, args or None)
                 return cur.rowcount
 
     async def insert(self, query: str, *args: Any) -> int:
-        """Führt ein INSERT aus und gibt die neue ID zurück."""
+        """Runs an INSERT and returns the new ID."""
         async with self._require_pool().acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(query, args or None)

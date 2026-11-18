@@ -1,4 +1,4 @@
-"""Schreibt alle Slash-Commands in die Tabelle bot_commands – die Website zeigt sie auf /commands an."""
+"""Writes all slash commands to the bot_commands table – the website lists them on /commands."""
 from __future__ import annotations
 
 import json
@@ -13,22 +13,23 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("bot.commands")
 
-# Cog-Klassenname -> Kategorie auf der Website (Reihenfolge = Anzeige-Reihenfolge)
+# Cog class name -> category on the website (order = display order)
 CATEGORIES = {
-    "General": "Allgemein",
-    "Levels": "Level-System",
+    "General": "General",
+    "Levels": "Leveling",
     "Moderation": "Moderation",
     "Fun": "Fun",
-    "Settings": "Einstellungen",
+    "Settings": "Settings",
 }
 
 PERMISSION_NAMES = {
     "administrator": "Administrator",
-    "manage_guild": "Server verwalten",
-    "manage_messages": "Nachrichten verwalten",
-    "moderate_members": "Mitglieder moderieren",
-    "kick_members": "Mitglieder kicken",
-    "ban_members": "Mitglieder bannen",
+    "manage_guild": "Manage Server",
+    "manage_messages": "Manage Messages",
+    "moderate_members": "Moderate Members",
+    "kick_members": "Kick Members",
+    "ban_members": "Ban Members",
+    "manage_roles": "Manage Roles",
 }
 
 
@@ -56,7 +57,7 @@ def _collect(bot: "PelicanBot") -> list[dict]:
 
     def add(cmd: app_commands.Command, parent: app_commands.Group | None = None) -> None:
         binding = cmd.binding or (parent and getattr(parent, "binding", None))
-        category = CATEGORIES.get(type(binding).__name__, "Sonstiges") if binding else "Sonstiges"
+        category = CATEGORIES.get(type(binding).__name__, "Other") if binding else "Other"
         perms = cmd.default_permissions or (parent.default_permissions if parent else None)
         guild_only = bool(getattr(cmd, "guild_only", False) or (parent and getattr(parent, "guild_only", False)))
         rows.append(
@@ -67,7 +68,7 @@ def _collect(bot: "PelicanBot") -> list[dict]:
                 "options": json.dumps(_options(cmd), ensure_ascii=False),
                 "permissions": _permissions(perms),
                 "guild_only": guild_only,
-                # Hybrid-Commands gibt es zusätzlich als Text-Command (z. B. !ping)
+                # Hybrid commands also exist as text commands (e.g. !ping)
                 "prefix_supported": parent is None and bot.get_command(cmd.name) is not None,
             }
         )
@@ -105,12 +106,12 @@ async def publish_commands(bot: "PelicanBot") -> None:
                 r["name"], r["category"], r["description"], r["options"], r["permissions"],
                 r["guild_only"], r["prefix_supported"], r["sort_order"],
             )
-        # Entfernte Befehle aus der Liste löschen
+        # Remove commands that no longer exist
         if rows:
             placeholders = ", ".join(["%s"] * len(rows))
             await bot.db.execute(
                 f"DELETE FROM bot_commands WHERE name NOT IN ({placeholders})", *[r["name"] for r in rows]
             )
-        log.info("%d Befehle für die Website veröffentlicht", len(rows))
-    except Exception:  # noqa: BLE001 – die Befehlsliste ist nicht kritisch für den Bot
-        log.exception("Befehlsliste konnte nicht gespeichert werden")
+        log.info("Published %d commands for the website", len(rows))
+    except Exception:  # noqa: BLE001 – the command list is not critical for the bot
+        log.exception("Could not store the command list")
