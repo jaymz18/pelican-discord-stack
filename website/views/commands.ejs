@@ -1,0 +1,57 @@
+<%- include('partials/head') %>
+
+<section class="hero card">
+  <div>
+    <h1>Befehle</h1>
+    <span class="muted">
+      <%= commands.total %> Slash-Commands · in Discord einfach <code>/</code> tippen.
+      Befehle mit <span class="tag">Text</span> funktionieren auch mit Prefix, z. B. <code>!ping</code>.
+    </span>
+  </div>
+</section>
+
+<% if (!commands.total) { %>
+  <section class="card center">
+    <p class="muted">Noch keine Befehle bekannt – die Liste erscheint, sobald der Bot einmal gestartet wurde.</p>
+  </section>
+<% } %>
+
+<% if (commands.categories.length > 1) { %>
+  <nav class="chips" aria-label="Kategorien">
+    <% commands.categories.forEach((cat) => { %>
+      <a class="chip" href="#<%= h.slug(cat.name) %>"><%= cat.name %> <span class="muted"><%= cat.commands.length %></span></a>
+    <% }) %>
+  </nav>
+<% } %>
+
+<% commands.categories.forEach((cat) => { %>
+  <section class="card category" id="<%= h.slug(cat.name) %>">
+    <h2><%= cat.name %></h2>
+    <ul class="cmd-list">
+      <% cat.commands.forEach((cmd) => { %>
+        <li class="cmd">
+          <div class="cmd-head">
+            <code class="cmd-name">/<%= cmd.name %><% cmd.options.forEach((o) => { %> <span class="opt <%= o.required ? 'req' : '' %>"><%= o.required ? `<${o.name}>` : `[${o.name}]` %></span><% }) %></code>
+            <span class="cmd-tags">
+              <% if (cmd.prefix) { %><span class="tag">Text</span><% } %>
+              <% if (cmd.guildOnly) { %><span class="tag subtle">nur Server</span><% } %>
+              <% if (cmd.permissions) { %><span class="tag perm" title="Benötigte Berechtigung"><%= cmd.permissions %></span><% } %>
+            </span>
+          </div>
+          <p class="cmd-desc"><%= cmd.description %></p>
+          <% const described = cmd.options.filter((o) => o.description); %>
+          <% if (described.length) { %>
+            <ul class="cmd-opts">
+              <% described.forEach((o) => { %>
+                <li><code><%= o.name %></code><% if (!o.required) { %> <span class="muted">(optional)</span><% } %> – <%= o.description %></li>
+              <% }) %>
+            </ul>
+          <% } %>
+          <% if (cmd.uses) { %><span class="cmd-uses muted small"><%= h.number(cmd.uses) %>× genutzt</span><% } %>
+        </li>
+      <% }) %>
+    </ul>
+  </section>
+<% }) %>
+
+<%- include('partials/foot') %>

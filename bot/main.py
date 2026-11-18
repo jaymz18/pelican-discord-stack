@@ -11,6 +11,7 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
+from utils.command_registry import publish_commands
 from utils.database import Database
 
 load_dotenv()
@@ -60,6 +61,8 @@ class PelicanBot(commands.Bot):
         for ext in EXTENSIONS:
             await self.load_extension(ext)
             log.info("Erweiterung geladen: %s", ext)
+
+        await publish_commands(self)
 
         dev_guild = (os.getenv("DEV_GUILD_ID") or "").strip()
         if dev_guild and not re.fullmatch(r"\d{17,20}", dev_guild):

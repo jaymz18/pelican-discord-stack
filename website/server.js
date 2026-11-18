@@ -7,7 +7,6 @@ const express = require('express');
 const db = require('./src/db');
 const helpers = require('./src/helpers');
 const pagesRouter = require('./src/routes/pages');
-const apiRouter = require('./src/routes/api');
 
 const PORT = Number(process.env.SERVER_PORT || process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -31,7 +30,6 @@ app.use((req, res, next) => {
 });
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h' }));
 
-app.use('/api', apiRouter);
 app.use('/', pagesRouter);
 
 app.use((req, res) => {
@@ -41,12 +39,7 @@ app.use((req, res) => {
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error('[error]', err);
-  const status = err.status || 500;
-  if (req.path.startsWith('/api')) {
-    res.status(status).json({ error: 'internal_error' });
-    return;
-  }
-  res.status(status).render('error', {
+  res.status(err.status || 500).render('error', {
     title: 'Fehler',
     message: db.isConnectionError(err)
       ? 'Die Datenbank ist gerade nicht erreichbar.'

@@ -68,3 +68,15 @@ CREATE TABLE IF NOT EXISTS bot_status (
     started_at     DATETIME         NOT NULL,
     last_heartbeat DATETIME         NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS bot_commands (
+    name             VARCHAR(100)     NOT NULL PRIMARY KEY,
+    category         VARCHAR(50)      NOT NULL,
+    description      VARCHAR(200)     NOT NULL,
+    options          TEXT             NULL,
+    permissions      VARCHAR(200)     NULL,
+    guild_only       TINYINT(1)       NOT NULL DEFAULT 0,
+    prefix_supported TINYINT(1)       NOT NULL DEFAULT 0,
+    sort_order       INT UNSIGNED     NOT NULL DEFAULT 0,
+    updated_at       DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

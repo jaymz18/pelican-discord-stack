@@ -30,4 +30,9 @@ router.get('/guild/:id', async (req, res, next) => {
   return res.render('guild', { title: guild.name, guild, leaderboard, events });
 });
 
+router.get('/commands', async (req, res) => {
+  const commands = await stats.getCommands();
+  res.render('commands', { title: 'Befehle', commands });
+});
+
 module.exports = router;

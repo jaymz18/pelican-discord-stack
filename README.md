@@ -126,11 +126,13 @@ Nach der Installation liegt der Code auf dem Server in `bot/` und `website/`.
 
 - **`/`**: Bot-Status (online/offline), Gesamtstatistiken, Server-Liste, beliebteste Befehle und letzte Aktivität
 - **`/guild/:id`**: Leaderboard und Aktivität eines Servers
-- **API:** `/api/health`, `/api/stats`, `/api/guilds`, `/api/guilds/:id/leaderboard?limit=25`
+- **`/commands`**: Alle Befehle des Bots, gruppiert nach Kategorie, mit Optionen, benötigten Rechten und Nutzungszahlen. Der Bot schreibt die Liste bei jedem Start in die Tabelle `bot_commands`, neue Befehle erscheinen also automatisch.
+
+Eine öffentliche JSON-API gibt es nicht.
 
 ## Datenbank
 
-Das Schema steht in [`bot/schema.sql`](bot/schema.sql). Es enthält die Tabellen `guilds`, `levels`, `warnings`, `command_log`, `member_events` und `bot_status`. Der Bot legt sie beim Start automatisch an (`CREATE TABLE IF NOT EXISTS`). Alle Zeitstempel werden in UTC gespeichert. Die Website rechnet sie in `SITE_TIMEZONE` um.
+Das Schema steht in [`bot/schema.sql`](bot/schema.sql). Es enthält die Tabellen `guilds`, `levels`, `warnings`, `command_log`, `member_events`, `bot_status` und `bot_commands`. Der Bot legt sie beim Start automatisch an (`CREATE TABLE IF NOT EXISTS`). Alle Zeitstempel werden in UTC gespeichert. Die Website rechnet sie in `SITE_TIMEZONE` um.
 
 ## Lokale Entwicklung
 

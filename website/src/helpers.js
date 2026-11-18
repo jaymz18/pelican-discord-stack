@@ -59,4 +59,13 @@ function initials(name) {
     .toUpperCase();
 }
 
-module.exports = { number, date, relative, levelInfo, avatar, initials };
+function slug(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
+module.exports = { number, date, relative, levelInfo, avatar, initials, slug };

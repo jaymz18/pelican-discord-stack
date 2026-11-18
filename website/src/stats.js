@@ -98,7 +98,40 @@ function getLeaderboard(guildId, limit = 50) {
   );
 }
 
+async function getCommands() {
+  const rows = await db.query(
+    `SELECT c.name, c.category, c.description, c.options, c.permissions,
+            c.guild_only, c.prefix_supported, COALESCE(u.uses, 0) AS uses
+       FROM bot_commands c
+       LEFT JOIN (SELECT command, COUNT(*) AS uses FROM command_log GROUP BY command) u
+              ON u.command = c.name
+      ORDER BY c.sort_order, c.name`,
+  );
+  const categories = new Map();
+  for (const row of rows) {
+    let options = [];
+    try {
+      options = JSON.parse(row.options || '[]');
+    } catch {
+      options = [];
+    }
+    const cmd = {
+      name: row.name,
+      description: row.description,
+      options,
+      permissions: row.permissions,
+      guildOnly: Boolean(row.guild_only),
+      prefix: Boolean(row.prefix_supported),
+      uses: Number(row.uses),
+    };
+    if (!categories.has(row.category)) categories.set(row.category, []);
+    categories.get(row.category).push(cmd);
+  }
+  return { total: rows.length, categories: [...categories.entries()].map(([name, commands]) => ({ name, commands })) };
+}
+
 module.exports = {
+  getCommands,
   getTotals,
   getBotStatus,
   getGuilds,
