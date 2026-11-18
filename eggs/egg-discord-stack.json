@@ -60,12 +60,12 @@
         },
         {
             "name": "Test-Server ID",
-            "description": "Optional: Server-ID, auf der Slash-Commands sofort synchronisiert werden (Entwicklung).",
+            "description": "Optional: Server-ID (Rechtsklick auf den Server -> ID kopieren), auf der Slash-Commands sofort synchronisiert werden.",
             "env_variable": "DEV_GUILD_ID",
             "default_value": "",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "nullable|numeric|digits_between:17,20",
+            "rules": "nullable|string|regex:/^\\d{17,20}$/",
             "field_type": "text"
         },
         {

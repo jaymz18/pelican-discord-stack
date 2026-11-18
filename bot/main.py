@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import sys
+import warnings
 
 import discord
 from discord.ext import commands
@@ -20,6 +22,8 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 logging.getLogger("discord.http").setLevel(logging.WARNING)
+# MariaDB meldet bei CREATE TABLE IF NOT EXISTS eine Note – das ist erwartet.
+warnings.filterwarnings("ignore", message=r"Table '.*' already exists")
 # Der Bot nutzt kein Voice – die Hinweise auf fehlende Voice-Pakete ausblenden.
 logging.getLogger("discord.client").addFilter(lambda r: "voice will NOT be supported" not in r.getMessage())
 log = logging.getLogger("bot")
@@ -57,7 +61,14 @@ class PelicanBot(commands.Bot):
             await self.load_extension(ext)
             log.info("Erweiterung geladen: %s", ext)
 
-        dev_guild = os.getenv("DEV_GUILD_ID")
+        dev_guild = (os.getenv("DEV_GUILD_ID") or "").strip()
+        if dev_guild and not re.fullmatch(r"\d{17,20}", dev_guild):
+            log.warning(
+                "DEV_GUILD_ID '%s' ist keine gültige Server-ID (17–20 Ziffern) – "
+                "synchronisiere Slash-Commands stattdessen global.",
+                dev_guild,
+            )
+            dev_guild = ""
         if dev_guild:
             guild = discord.Object(id=int(dev_guild))
             self.tree.copy_global_to(guild=guild)
