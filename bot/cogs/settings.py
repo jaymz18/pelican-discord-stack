@@ -7,6 +7,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from config import DEFAULT_WELCOME_CHANNEL_ID
 from utils.helpers import upsert_guild
 
 if TYPE_CHECKING:
@@ -55,8 +56,11 @@ class Settings(commands.Cog):
     @setup.command(name="disable", description="Disables welcome messages or logs")
     @app_commands.describe(feature="Feature to disable")
     async def disable(self, interaction: discord.Interaction, feature: Literal["welcome", "logs"]) -> None:
-        column = {"welcome": "welcome_channel_id", "logs": "log_channel_id"}[feature]
-        await self._set(interaction.guild, column, None)
+        if feature == "welcome":
+            # 0 = explicitly disabled (NULL would fall back to the default welcome channel)
+            await self._set(interaction.guild, "welcome_channel_id", 0)
+        else:
+            await self._set(interaction.guild, "log_channel_id", None)
         await interaction.response.send_message(f"✅ `{feature}` disabled.", ephemeral=True)
 
     @setup.command(name="show", description="Shows the current settings")
@@ -71,9 +75,19 @@ class Settings(commands.Cog):
             return f"<#{cid}>" if cid else "*disabled*"
 
         embed = discord.Embed(title=f"⚙️ Settings – {interaction.guild.name}", color=discord.Color.gold())
-        embed.add_field(name="Welcome channel", value=channel(row["welcome_channel_id"]))
+        welcome_id = row["welcome_channel_id"]
+        if welcome_id == 0:
+            welcome = "*disabled*"
+        elif welcome_id:
+            welcome = f"<#{welcome_id}>"
+        elif interaction.guild.get_channel(DEFAULT_WELCOME_CHANNEL_ID):
+            welcome = f"<#{DEFAULT_WELCOME_CHANNEL_ID}> (default)"
+        else:
+            welcome = "*not set*"
+        embed.add_field(name="Welcome channel", value=welcome)
         embed.add_field(name="Log channel", value=channel(row["log_channel_id"]))
         embed.add_field(name="Welcome text", value=row["welcome_message"] or "*default*", inline=False)
+        embed.add_field(name="Placeholders", value="`{user}` `{server}` `{count}`", inline=False)
         embed.set_footer(text="Leveling settings: /levelconfig show")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 

@@ -131,6 +131,12 @@ Alle Befehle, Antworten und Logs des Bots sind auf **Englisch**.
   - `/xp give|take|set|reset` ändert die XP einzelner Mitglieder.
   - `/levelconfig reset-all` setzt alle Mitglieder zurück, nach einer Bestätigung per Button.
 
+### Willkommensnachrichten
+
+- **Kanal:** Ohne Einstellung nutzt der Bot den Standardkanal `DEFAULT_WELCOME_CHANNEL_ID` aus [`bot/config.py`](bot/config.py), aber nur auf dem Server, zu dem dieser Kanal gehört. `/setup welcome #kanal` überschreibt das, `/setup disable welcome` schaltet die Nachrichten ab.
+- **Bots:** Sie werden nicht begrüßt und bei „Total members“ nicht mitgezählt.
+- **Text:** Ein eigener Text ist mit `/setup welcome-message` möglich (Platzhalter `{user}`, `{server}` und `{count}`).
+
 ### Events
 
 | Event | Funktion |
@@ -138,7 +144,7 @@ Alle Befehle, Antworten und Logs des Bots sind auf **Englisch**.
 | `on_ready` | Server in der DB registrieren, Status setzen |
 | `on_message` | Nachrichten-XP vergeben (Cooldown 60 s), Level-Up melden, Rollen-Belohnungen vergeben |
 | Voice-XP (jede Minute) | XP für aktive Mitglieder in Sprachkanälen |
-| `on_member_join` / `on_member_remove` | Willkommensnachricht, Log-Eintrag, Join/Leave-Statistik, Level-Rollen bei Wiederbeitritt |
+| `on_member_join` / `on_member_remove` | Willkommensnachricht (nicht für Bots), Log-Eintrag, Join/Leave-Statistik, Level-Rollen bei Wiederbeitritt |
 | `on_message_delete` / `on_message_edit` | Log-Kanal |
 | `on_guild_join` / `on_guild_remove` / `on_guild_update` | Server-Liste in der DB pflegen |
 | `on_app_command_completion` / `on_command_completion` | Nutzungsstatistik der Commands |

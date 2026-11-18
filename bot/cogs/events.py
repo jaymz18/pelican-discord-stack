@@ -9,6 +9,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+from config import DEFAULT_WELCOME_CHANNEL_ID
 from utils.helpers import send_log, upsert_guild
 
 if TYPE_CHECKING:
@@ -16,7 +17,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("bot.events")
 
-DEFAULT_WELCOME = "Welcome to **{server}**, {user}! You are member **#{count}**."
+DEFAULT_WELCOME = "We're glad to have you here, {user}!"
 
 
 class Events(commands.Cog):
@@ -100,41 +101,96 @@ class Events(commands.Cog):
         )
         await upsert_guild(self.bot, member.guild)
 
+    async def _welcome_channel(self, member: discord.Member) -> tuple[discord.abc.GuildChannel | None, str | None]:
+        """Returns (channel, custom message). Channel set via /setup welcome wins, else the default channel."""
+        row = None
+        try:
+            row = await self.bot.db.fetchone(
+                "SELECT welcome_channel_id, welcome_message FROM guilds WHERE guild_id = %s", member.guild.id
+            )
+        except Exception:  # noqa: BLE001 – a DB hiccup must not block the welcome message
+            log.exception("Could not read welcome settings – using the default welcome channel")
+
+        stored = row["welcome_channel_id"] if row else None
+        if stored == 0:  # disabled with /setup disable welcome
+            return None, None
+        channel_id = int(stored) if stored else DEFAULT_WELCOME_CHANNEL_ID
+        channel = member.guild.get_channel(channel_id)
+        if channel is None and channel_id == DEFAULT_WELCOME_CHANNEL_ID:
+            # The default channel belongs to one specific server – ignore it on other servers.
+            return None, None
+        return channel, (row["welcome_message"] if row else None)
+
+    async def _send_welcome(self, member: discord.Member) -> None:
+        channel, custom = await self._welcome_channel(member)
+        if channel is None:
+            log.info("Welcome messages are off or no channel is set for %s (/setup welcome)", member.guild.name)
+            return
+        if not isinstance(channel, discord.abc.Messageable):
+            log.warning("Welcome channel %s is not a text channel", channel.id)
+            return
+
+        humans = sum(1 for m in member.guild.members if not m.bot) or member.guild.member_count
+        description = (
+            (custom or DEFAULT_WELCOME)
+            .replace("{user}", member.mention)
+            .replace("{server}", member.guild.name)
+            .replace("{count}", str(humans))
+        )
+        embed = discord.Embed(
+            title="🎉 Welcome to the server!",
+            description=description,
+            color=discord.Color.gold(),
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.add_field(name="👤 Username", value=member.name, inline=True)
+        embed.add_field(name="📅 Account created", value=discord.utils.format_dt(member.created_at, "D"), inline=True)
+        embed.add_field(name="👥 Total members", value=str(humans), inline=True)
+        embed.set_footer(
+            text=f"Welcome to {member.guild.name}",
+            icon_url=member.guild.icon.url if member.guild.icon else None,
+        )
+        try:
+            await channel.send(
+                content=member.mention,
+                embed=embed,
+                allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+            )
+            log.info("Welcomed %s in #%s", member, getattr(channel, "name", channel.id))
+        except discord.Forbidden:
+            log.warning("Missing permission to send the welcome message in #%s", getattr(channel, "name", channel.id))
+        except discord.HTTPException as exc:
+            log.warning("Welcome message failed: %s", exc)
+
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
-        await self._member_event(member, "join")
+        # Welcome first, so database problems can never block it. Bots are not welcomed.
+        if not member.bot:
+            await self._send_welcome(member)
 
-        row = await self.bot.db.fetchone(
-            "SELECT welcome_channel_id, welcome_message FROM guilds WHERE guild_id = %s", member.guild.id
-        )
-        if row and row["welcome_channel_id"]:
-            channel = member.guild.get_channel(int(row["welcome_channel_id"]))
-            if isinstance(channel, discord.TextChannel):
-                text = (
-                    (row["welcome_message"] or DEFAULT_WELCOME)
-                    .replace("{user}", member.mention)
-                    .replace("{server}", member.guild.name)
-                    .replace("{count}", str(member.guild.member_count))
-                )
-                embed = discord.Embed(title="👋 Welcome!", description=text, color=discord.Color.green())
-                embed.set_thumbnail(url=member.display_avatar.url)
-                try:
-                    await channel.send(embed=embed)
-                except discord.HTTPException as exc:
-                    log.warning("Welcome message failed: %s", exc)
+        try:
+            await self._member_event(member, "join")
+        except Exception:  # noqa: BLE001
+            log.exception("Could not store join event")
 
         # Members who rejoin get their level reward roles back
         levels = getattr(self.bot, "levels", None)
-        if levels is not None:
-            stored = await self.bot.db.fetchone(
-                "SELECT level FROM levels WHERE guild_id = %s AND user_id = %s", member.guild.id, member.id
-            )
-            if stored and stored["level"] > 0:
-                await levels.sync_rewards(member, int(stored["level"]))
+        if levels is not None and not member.bot:
+            try:
+                stored = await self.bot.db.fetchone(
+                    "SELECT level FROM levels WHERE guild_id = %s AND user_id = %s", member.guild.id, member.id
+                )
+                if stored and stored["level"] > 0:
+                    await levels.sync_rewards(member, int(stored["level"]))
+            except Exception:  # noqa: BLE001
+                log.exception("Could not restore level rewards")
 
         embed = discord.Embed(description=f"📥 {member.mention} joined the server.", color=discord.Color.green())
         embed.set_author(name=str(member), icon_url=member.display_avatar.url)
         embed.add_field(name="Account created", value=discord.utils.format_dt(member.created_at, "R"))
+        if member.bot:
+            embed.add_field(name="Bot", value="Yes")
         await send_log(self.bot, member.guild, embed)
 
     @commands.Cog.listener()
