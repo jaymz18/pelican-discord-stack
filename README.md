@@ -1,77 +1,97 @@
 # pelican-discord-stack
 
-Ein Discord-Bot in **Python** und ein Web-Dashboard in **Node.js**. Beide nutzen eine gemeinsame **MariaDB**. Für beide gibt es ein **Docker-Image** und ein **Egg** für das [Pelican Panel](https://pelican.dev). Die Images baut GitHub Actions automatisch und veröffentlicht sie in der GitHub Container Registry (GHCR).
+Ein Discord-Bot in **Python** und ein Web-Dashboard in **Node.js**, die sich eine **MariaDB** teilen. Beide laufen zusammen in **einem** Pelican-Server, gestartet aus **einem** Docker-Image mit **einem** Egg. GitHub Actions baut das Image automatisch und pusht es in die GitHub Container Registry (GHCR).
 
-[![Docker Images](https://github.com/jaymz18/pelican-discord-stack/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/jaymz18/pelican-discord-stack/actions/workflows/docker-publish.yml)
+[![Docker Image](https://github.com/jaymz18/pelican-discord-stack/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/jaymz18/pelican-discord-stack/actions/workflows/docker-publish.yml)
 [![CI](https://github.com/jaymz18/pelican-discord-stack/actions/workflows/ci.yml/badge.svg)](https://github.com/jaymz18/pelican-discord-stack/actions/workflows/ci.yml)
 
 ```
-┌────────────────┐        ┌───────────┐        ┌──────────────────┐
-│ Discord-Bot    │ ─────▶ │  MariaDB  │ ◀───── │ Website (Node.js)│
-│ (discord.py)   │ schreibt│           │ liest  │ Express + EJS    │
-└────────────────┘        └───────────┘        └──────────────────┘
-   Pelican-Server            Pelican              Pelican-Server
-   (Egg: Bot)              Database Host          (Egg: Website)
+┌──────────────── Pelican-Server (Egg: Discord Bot + Website) ───────────────┐
+│                                                                            │
+│   ┌────────────────┐                          ┌──────────────────────┐     │
+│   │ Discord-Bot    │                          │ Website (Node.js)    │     │
+│   │ bot/ (Python)  │                          │ website/ · Port      │     │
+│   └───────┬────────┘                          └──────────┬───────────┘     │
+└───────────┼──────────────────────────────────────────────┼─────────────────┘
+            │ schreibt          ┌───────────┐       liest  │
+            └─────────────────▶ │  MariaDB  │ ◀────────────┘
+                                │ (Pelican  │
+                                │ Database) │
+                                └───────────┘
 ```
 
 ## Inhalt
 
 | Pfad | Beschreibung |
 |---|---|
-| `docker/bot/` | Dockerfile + Entrypoint für das Bot-Image (Python 3.13) |
-| `docker/website/` | Dockerfile + Entrypoint für das Website-Image (Node.js 24) |
-| `eggs/egg-discord-bot.json` | Pelican-Egg für den Bot |
-| `eggs/egg-website.json` | Pelican-Egg für die Website |
+| `docker/Dockerfile` | Image mit Python 3.13 **und** Node.js 24 |
+| `docker/entrypoint.sh` | Pelican-Entrypoint: Auto-Update, Abhängigkeiten, Startbefehl |
+| `docker/start-stack.sh` | Startet Bot und Website parallel (im Image als `start-stack`) |
+| `eggs/egg-discord-stack.json` | Das Pelican-Egg |
 | `bot/` | Quellcode des Discord-Bots |
 | `website/` | Quellcode der Website |
-| `.github/workflows/docker-publish.yml` | Baut und pusht beide Images nach GHCR (amd64 + arm64) |
-| `.github/workflows/ci.yml` | Prüft Eggs, Python- und JS-Code |
+| `.github/workflows/docker-publish.yml` | Baut das Image und pusht es nach GHCR (amd64 + arm64) |
+| `.github/workflows/ci.yml` | Prüft das Egg sowie Python- und JS-Code |
 | `docker-compose.yml` | Lokale Entwicklungsumgebung inkl. MariaDB |
 
-## Docker-Images
+## Docker-Image
 
-| Image | Basis |
-|---|---|
-| `ghcr.io/jaymz18/pelican-discord-stack-bot:latest` | `python:3.13-slim-bookworm` |
-| `ghcr.io/jaymz18/pelican-discord-stack-website:latest` | `node:24-bookworm-slim` |
+```
+ghcr.io/jaymz18/pelican-discord-stack:latest
+```
 
-Die Images sind Pelican-kompatibel: Benutzer `container`, Arbeitsverzeichnis `/home/container`, `tini` als Init-Prozess und `STOPSIGNAL SIGINT`. Beim Start passiert Folgendes:
+Das Image basiert auf `python:3.13-slim-bookworm`. Node.js 24 und npm werden aus dem offiziellen Image `node:24-bookworm-slim` übernommen. Es ist Pelican-kompatibel: Benutzer `container`, Arbeitsverzeichnis `/home/container`, `tini` als Init-Prozess und `STOPSIGNAL SIGINT`.
 
-1. Ist `AUTO_UPDATE=1` gesetzt, wird der aktuelle Code aus `GIT_REPO`/`GIT_BRANCH` geholt.
-2. Die Abhängigkeiten werden installiert (`pip install --user -r requirements.txt` bzw. `npm install`).
-3. Der Startbefehl aus dem Egg (`STARTUP` mit `{{VARIABLEN}}`) wird aufgelöst und ausgeführt.
+Beim Start passiert Folgendes:
 
-Neue Images entstehen bei jedem Push auf `main`, der etwas unter `docker/` ändert, außerdem einmal pro Woche (für Sicherheitsupdates der Basis-Images) und bei manuellem Start in GitHub Actions.
+1. Ist `AUTO_UPDATE=1` gesetzt, werden `bot/` und `website/` aus `GIT_REPO`/`GIT_BRANCH` aktualisiert.
+2. Die Abhängigkeiten werden installiert (`pip install --user -r bot/requirements.txt` und `npm install` in `website/`).
+3. `start-stack` startet die Website (`node website/server.js`) und den Bot (`python bot/main.py`) parallel.
+   - Mit `ENABLE_BOT` bzw. `ENABLE_WEBSITE` lässt sich jeder Dienst abschalten.
+   - Beendet sich einer der beiden Dienste, stoppt `start-stack` auch den anderen. So erkennt Pelican einen Absturz.
+   - Der Stop-Befehl aus Pelican (`^C`) wird an beide Dienste weitergereicht, die dann sauber herunterfahren.
 
-> **Wichtig:** Neue GHCR-Pakete sind zunächst **privat**. Stelle sie nach dem ersten Build einmal auf *Public*: GitHub → Profil → *Packages* → Paket → *Package settings* → *Change visibility*. Sonst kann Pelican die Images nicht ohne Zugangsdaten herunterladen.
+### Workflow → GitHub Container Registry
+
+`.github/workflows/docker-publish.yml` baut das Image und pusht es nach `ghcr.io/<owner>/pelican-discord-stack`. Die Anmeldung läuft über den eingebauten `GITHUB_TOKEN`, Secrets sind nicht nötig. Der Workflow läuft:
+
+- bei jedem Push auf `main`, der etwas unter `docker/` ändert → Tag `latest` und `sha-xxxxxxx`
+- bei Git-Tags `v*` (z. B. `v1.2.0`) → zusätzlich die Tags `1.2.0` und `1.2`
+- jeden Montag (Rebuild für Sicherheitsupdates der Basis-Images)
+- bei manuellem Start (*Actions → Docker Image → Run workflow*)
+- bei Pull Requests: Das Image wird nur gebaut, nicht gepusht.
 
 ## Installation in Pelican
 
-### 1. Eggs importieren
-Im Admin-Bereich unter **Eggs → Import** die Eggs per URL importieren:
+### 1. Egg importieren
+Im Admin-Bereich unter **Eggs → Import** das Egg per URL importieren:
 
 ```
-https://raw.githubusercontent.com/jaymz18/pelican-discord-stack/main/eggs/egg-discord-bot.json
-https://raw.githubusercontent.com/jaymz18/pelican-discord-stack/main/eggs/egg-website.json
+https://raw.githubusercontent.com/jaymz18/pelican-discord-stack/main/eggs/egg-discord-stack.json
 ```
 
-Die Eggs liegen im Format `PTDL_v2` vor, das Pelican direkt importiert. Über die hinterlegte `update_url` lassen sie sich später im Panel aktualisieren.
+Das Egg liegt im Format `PTDL_v2` vor, das Pelican direkt importiert. Über die hinterlegte `update_url` lässt es sich später im Panel aktualisieren.
 
 ### 2. Database Host einrichten (einmalig)
 Unter **Admin → Database Hosts** einen MariaDB-Server eintragen. Läuft MariaDB auf dem Node selbst, ist der Container über das Docker-Gateway erreichbar, meist `172.18.0.1`. MariaDB muss dafür auf dieser Adresse lauschen (`bind-address`).
 
 ### 3. Server erstellen
-1. **Bot-Server** mit dem Egg *Discord Bot (Python)* anlegen und den Discord-Token eintragen.
+1. Einen Server mit dem Egg *Discord Bot + Website* anlegen. Die Allocation (der Port) ist der Port der Website.
 2. Im Server-Tab **Datenbanken** eine neue Datenbank erstellen.
-3. Die angezeigten Zugangsdaten unter **Startup** eintragen: `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME` und `DB_PASSWORD`.
-4. **Website-Server** mit dem Egg *Bot Website (Node.js)* anlegen. Er braucht eine Allocation mit freiem Port. Dort **dieselben** Datenbank-Zugangsdaten eintragen, denn Bot und Website teilen sich die Datenbank.
-5. Beide Server starten. Die Tabellen legt der Bot beim ersten Start automatisch an.
+3. Unter **Startup** den `DISCORD_TOKEN` und die Datenbank-Zugangsdaten eintragen: `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME` und `DB_PASSWORD`.
+4. Den Server starten. Die Tabellen legt der Bot beim ersten Start automatisch an.
+
+Nach der Installation liegt der Code auf dem Server in `bot/` und `website/`.
 
 ### Egg-Variablen
 
-**Bot:** `DISCORD_TOKEN`, `DEV_GUILD_ID` (optional, synchronisiert Slash-Commands sofort auf einem Test-Server), `BOT_PREFIX`, `LOG_LEVEL`, `BOT_FILE`, `DB_*`, `GIT_REPO`, `GIT_BRANCH`, `AUTO_UPDATE`
-
-**Website:** `SITE_TITLE`, `BOT_INVITE_URL`, `SITE_TIMEZONE`, `MAIN_FILE`, `DB_*`, `GIT_REPO`, `GIT_BRANCH`, `AUTO_UPDATE`. Den Port stellt Pelican über `SERVER_PORT` bereit.
+| Gruppe | Variablen |
+|---|---|
+| Dienste | `ENABLE_BOT`, `ENABLE_WEBSITE` (jeweils `1`/`0`) |
+| Bot | `DISCORD_TOKEN`, `DEV_GUILD_ID` (optional, synchronisiert Slash-Commands sofort auf einem Test-Server), `BOT_PREFIX`, `LOG_LEVEL`, `BOT_FILE` |
+| Website | `SITE_TITLE`, `BOT_INVITE_URL`, `SITE_TIMEZONE`, `WEBSITE_FILE`. Den Port stellt Pelican über `SERVER_PORT` bereit. |
+| Datenbank | `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` |
+| Updates | `GIT_REPO`, `GIT_BRANCH`, `AUTO_UPDATE` |
 
 ## Discord-Bot einrichten
 
@@ -115,12 +135,12 @@ Das Schema steht in [`bot/schema.sql`](bot/schema.sql). Es enthält die Tabellen
 ## Lokale Entwicklung
 
 ```bash
-docker compose up --build                 # MariaDB + Website auf http://localhost:3000
-cp bot/.env.example bot/.env              # DISCORD_TOKEN eintragen
-docker compose --profile bot up --build   # zusätzlich den Bot starten
+docker compose up --build   # MariaDB + Website auf http://localhost:3000
 ```
 
-Die Compose-Umgebung nutzt dieselben Images und denselben `STARTUP`-Mechanismus wie Pelican.
+Um zusätzlich den Bot zu starten, im Projektroot eine `.env` mit `DISCORD_TOKEN=...` und `ENABLE_BOT=1` anlegen.
+
+Die Compose-Umgebung nutzt dasselbe Image und denselben `STARTUP`-Mechanismus (`start-stack`) wie Pelican.
 
 ## Lizenz
 

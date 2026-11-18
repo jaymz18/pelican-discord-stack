@@ -2,32 +2,52 @@
     "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PELICAN PANEL - PELICAN.DEV",
     "meta": {
         "version": "PTDL_v2",
-        "update_url": "https://raw.githubusercontent.com/jaymz18/pelican-discord-stack/main/eggs/egg-discord-bot.json"
+        "update_url": "https://raw.githubusercontent.com/jaymz18/pelican-discord-stack/main/eggs/egg-discord-stack.json"
     },
     "exported_at": "2026-11-18T12:00:00+00:00",
-    "name": "Discord Bot (Python)",
+    "name": "Discord Bot + Website",
     "author": "jaymz18@users.noreply.github.com",
-    "description": "Python Discord-Bot (discord.py) mit Slash-Commands, Events, Level-System, Moderation und MariaDB-Anbindung. Teil von pelican-discord-stack.",
+    "description": "Python Discord-Bot (discord.py) mit Slash-Commands, Events, Level-System und Moderation plus Node.js-Dashboard – beide in einem Server, gemeinsam mit einer MariaDB. Teil von pelican-discord-stack.",
     "features": null,
     "docker_images": {
-        "Python 3.13 (Bot-Image)": "ghcr.io/jaymz18/pelican-discord-stack-bot:latest"
+        "Python 3.13 + Node.js 24": "ghcr.io/jaymz18/pelican-discord-stack:latest"
     },
     "file_denylist": [],
-    "startup": "python {{BOT_FILE}}",
+    "startup": "start-stack",
     "config": {
         "files": "{}",
-        "startup": "{\"done\": \"Bot online als\"}",
+        "startup": "{\"done\": [\"Bot online als\", \"Website listening on\"]}",
         "logs": "{}",
         "stop": "^C"
     },
     "scripts": {
         "installation": {
-            "script": "#!/bin/bash\n# Pelican Installationsskript – klont den Discord-Bot aus dem GitHub-Repository\nset -e\napt-get update -qq\napt-get install -y -qq --no-install-recommends git ca-certificates > /dev/null\n\nmkdir -p /mnt/server\ncd /mnt/server\n\nGIT_BRANCH=${GIT_BRANCH:-main}\nGIT_SUBDIR=${GIT_SUBDIR:-bot}\n\necho \"Klone ${GIT_REPO} (Branch: ${GIT_BRANCH}) ...\"\nrm -rf /tmp/src\ngit clone --depth 1 --branch \"${GIT_BRANCH}\" \"${GIT_REPO}\" /tmp/src\n\nif [ ! -d \"/tmp/src/${GIT_SUBDIR}\" ]; then\n    echo \"FEHLER: Unterordner '${GIT_SUBDIR}' existiert nicht im Repository.\"\n    exit 1\nfi\n\ncp -r \"/tmp/src/${GIT_SUBDIR}/.\" /mnt/server/\nrm -rf /tmp/src\n\nif [ ! -f /mnt/server/.env ] && [ -f /mnt/server/.env.example ]; then\n    echo \"Hinweis: Konfiguration erfolgt über die Pelican-Variablen, .env ist optional.\"\nfi\n\necho \"Installation abgeschlossen.\"\n",
+            "script": "#!/bin/bash\n# Pelican Installationsskript – klont Bot und Website aus dem GitHub-Repository\nset -e\napt-get update -qq\napt-get install -y -qq --no-install-recommends git ca-certificates > /dev/null\n\nmkdir -p /mnt/server\ncd /mnt/server\n\nGIT_BRANCH=${GIT_BRANCH:-main}\n\necho \"Klone ${GIT_REPO} (Branch: ${GIT_BRANCH}) ...\"\nrm -rf /tmp/src\ngit clone --depth 1 --branch \"${GIT_BRANCH}\" \"${GIT_REPO}\" /tmp/src\n\nfor dir in bot website; do\n    if [ ! -d \"/tmp/src/${dir}\" ]; then\n        echo \"FEHLER: Ordner '${dir}' existiert nicht im Repository.\"\n        exit 1\n    fi\n    mkdir -p \"/mnt/server/${dir}\"\n    cp -r \"/tmp/src/${dir}/.\" \"/mnt/server/${dir}/\"\n    echo \"-> ${dir}/ installiert\"\ndone\n\nrm -rf /tmp/src\necho \"Installation abgeschlossen. Bot-Token und Datenbank unter 'Startup' eintragen.\"\n",
             "container": "debian:bookworm-slim",
             "entrypoint": "bash"
         }
     },
     "variables": [
+        {
+            "name": "Bot aktivieren",
+            "description": "1 = Discord-Bot starten, 0 = deaktiviert.",
+            "env_variable": "ENABLE_BOT",
+            "default_value": "1",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        },
+        {
+            "name": "Website aktivieren",
+            "description": "1 = Website auf dem Server-Port starten, 0 = deaktiviert.",
+            "env_variable": "ENABLE_WEBSITE",
+            "default_value": "1",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        },
         {
             "name": "Discord Bot Token",
             "description": "Token aus dem Discord Developer Portal (Bot -> Reset Token).",
@@ -35,7 +55,7 @@
             "default_value": "",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "required|string|max:120",
+            "rules": "nullable|string|max:120",
             "field_type": "text"
         },
         {
@@ -49,7 +69,7 @@
             "field_type": "text"
         },
         {
-            "name": "Prefix",
+            "name": "Bot Prefix",
             "description": "Prefix für Text-Commands (zusätzlich zu Slash-Commands).",
             "env_variable": "BOT_PREFIX",
             "default_value": "!",
@@ -59,7 +79,7 @@
             "field_type": "text"
         },
         {
-            "name": "Log-Level",
+            "name": "Bot Log-Level",
             "description": "DEBUG, INFO, WARNING oder ERROR.",
             "env_variable": "LOG_LEVEL",
             "default_value": "INFO",
@@ -69,10 +89,50 @@
             "field_type": "text"
         },
         {
-            "name": "Startdatei",
-            "description": "Python-Datei, die gestartet wird.",
+            "name": "Bot Startdatei",
+            "description": "Python-Datei im Ordner bot/.",
             "env_variable": "BOT_FILE",
             "default_value": "main.py",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:64",
+            "field_type": "text"
+        },
+        {
+            "name": "Seitentitel",
+            "description": "Titel, der auf der Website angezeigt wird.",
+            "env_variable": "SITE_TITLE",
+            "default_value": "Discord Bot Dashboard",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:80",
+            "field_type": "text"
+        },
+        {
+            "name": "Bot-Einladungslink",
+            "description": "Optional: OAuth2-Link zum Einladen des Bots (Button auf der Website).",
+            "env_variable": "BOT_INVITE_URL",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:500",
+            "field_type": "text"
+        },
+        {
+            "name": "Zeitzone",
+            "description": "Zeitzone für Datumsanzeigen auf der Website.",
+            "env_variable": "SITE_TIMEZONE",
+            "default_value": "Europe/Berlin",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:64",
+            "field_type": "text"
+        },
+        {
+            "name": "Website Startdatei",
+            "description": "JavaScript-Datei im Ordner website/.",
+            "env_variable": "WEBSITE_FILE",
+            "default_value": "server.js",
             "user_viewable": true,
             "user_editable": true,
             "rules": "required|string|max:64",
@@ -145,16 +205,6 @@
             "default_value": "main",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "required|string|max:100",
-            "field_type": "text"
-        },
-        {
-            "name": "Git Unterordner",
-            "description": "Ordner im Repository, der auf den Server kopiert wird.",
-            "env_variable": "GIT_SUBDIR",
-            "default_value": "bot",
-            "user_viewable": true,
-            "user_editable": false,
             "rules": "required|string|max:100",
             "field_type": "text"
         },

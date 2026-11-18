@@ -61,7 +61,10 @@ async function start() {
     console.log(`Website listening on http://${HOST}:${PORT}`);
   });
 
+  let stopping = false;
   const shutdown = (signal) => {
+    if (stopping) return;
+    stopping = true;
     console.log(`${signal} empfangen – Website wird beendet ...`);
     server.close(() => {
       db.close().finally(() => process.exit(0));
