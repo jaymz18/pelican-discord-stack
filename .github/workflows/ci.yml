@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Eggs validieren
+        run: python .github/scripts/validate_eggs.py
+
+      - name: Bot – Abhängigkeiten & Syntax
+        run: |
+          pip install -r bot/requirements.txt
+          python -m compileall -q bot
+          cd bot && python -c "import utils.database, cogs.events, cogs.general, cogs.levels, cogs.moderation, cogs.fun, cogs.settings"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Website – Abhängigkeiten & Syntax
+        working-directory: website
+        run: |
+          npm ci --no-audit --no-fund
+          find . -path ./node_modules -prune -o -name '*.js' -print | xargs -n1 node --check

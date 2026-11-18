@@ -1,0 +1,64 @@
+# Lokale Entwicklungsumgebung – simuliert Pelican (gleiche Images, gleicher STARTUP-Mechanismus).
+#   docker compose up --build                  -> MariaDB + Website (http://localhost:3000)
+#   docker compose --profile bot up --build    -> zusätzlich der Bot (bot/.env mit DISCORD_TOKEN nötig)
+services:
+  mariadb:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: discord
+      MARIADB_USER: discord
+      MARIADB_PASSWORD: discord
+    ports:
+      - "3306:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  website:
+    build: ./docker/website
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      STARTUP: "node {{MAIN_FILE}}"
+      MAIN_FILE: server.js
+      SERVER_PORT: "3000"
+      SITE_TITLE: Discord Bot Dashboard (Dev)
+      DB_HOST: mariadb
+      DB_PORT: "3306"
+      DB_DATABASE: discord
+      DB_USERNAME: discord
+      DB_PASSWORD: discord
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./website:/home/container
+
+  bot:
+    profiles: ["bot"]
+    build: ./docker/bot
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    env_file:
+      - path: ./bot/.env
+        required: false
+    environment:
+      STARTUP: "python {{BOT_FILE}}"
+      BOT_FILE: main.py
+      DB_HOST: mariadb
+      DB_PORT: "3306"
+      DB_DATABASE: discord
+      DB_USERNAME: discord
+      DB_PASSWORD: discord
+    volumes:
+      - ./bot:/home/container
+
+volumes:
+  db-data:

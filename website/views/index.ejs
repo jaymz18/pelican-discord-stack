@@ -1,0 +1,81 @@
+<%- include('partials/head') %>
+
+<section class="hero card">
+  <img class="avatar lg" src="<%= h.avatar(bot.avatar) %>" alt="">
+  <div>
+    <h1><%= bot.name || siteTitle %></h1>
+    <% if (!bot.known) { %>
+      <span class="status unknown">● Noch keine Daten – starte den Bot</span>
+    <% } else if (bot.online) { %>
+      <span class="status online">● Online</span>
+      <span class="muted">seit <%= h.relative(bot.startedAt).replace(/^vor /, '') %> · <%= bot.latency ?? '–' %> ms Latenz</span>
+    <% } else { %>
+      <span class="status offline">● Offline</span>
+      <span class="muted">zuletzt gesehen <%= h.relative(bot.lastHeartbeat) %></span>
+    <% } %>
+  </div>
+</section>
+
+<section class="stats">
+  <div class="card stat"><span class="label">Server</span><span class="value"><%= h.number(totals.guilds) %></span></div>
+  <div class="card stat"><span class="label">Aktive Mitglieder</span><span class="value"><%= h.number(totals.members) %></span></div>
+  <div class="card stat"><span class="label">Nachrichten</span><span class="value"><%= h.number(totals.messages) %></span></div>
+  <div class="card stat"><span class="label">Befehle</span><span class="value"><%= h.number(totals.commands) %></span></div>
+  <div class="card stat"><span class="label">Verwarnungen</span><span class="value"><%= h.number(totals.warnings) %></span></div>
+</section>
+
+<div class="grid">
+  <section class="card">
+    <h2>Server</h2>
+    <% if (!guilds.length) { %>
+      <p class="muted">Der Bot ist noch auf keinem Server.</p>
+    <% } %>
+    <ul class="list">
+      <% guilds.forEach((g) => { %>
+        <li>
+          <a class="row" href="/guild/<%= g.guild_id %>">
+            <% if (g.icon_url) { %>
+              <img class="avatar" src="<%= g.icon_url %>" alt="">
+            <% } else { %>
+              <span class="avatar placeholder"><%= h.initials(g.name) %></span>
+            <% } %>
+            <span class="grow"><strong><%= g.name %></strong><br><span class="muted"><%= h.number(g.member_count) %> Mitglieder · <%= h.number(g.tracked) %> im Ranking</span></span>
+            <span class="chev">›</span>
+          </a>
+        </li>
+      <% }) %>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Beliebteste Befehle <span class="muted small">(30 Tage)</span></h2>
+    <% if (!topCommands.length) { %>
+      <p class="muted">Noch keine Befehle ausgeführt.</p>
+    <% } %>
+    <ul class="bars">
+      <% topCommands.forEach((c) => { %>
+        <li>
+          <span class="bar-label">/<%= c.command %></span>
+          <span class="bar"><span style="width: <%= Math.round(Number(c.uses) / maxUses * 100) %>%"></span></span>
+          <span class="bar-value"><%= h.number(c.uses) %></span>
+        </li>
+      <% }) %>
+    </ul>
+
+    <h2>Letzte Aktivität</h2>
+    <% if (!events.length) { %>
+      <p class="muted">Keine Join-/Leave-Events.</p>
+    <% } %>
+    <ul class="list compact">
+      <% events.forEach((e) => { %>
+        <li class="row">
+          <span class="badge <%= e.event %>"><%= e.event === 'join' ? 'Beitritt' : 'Verlassen' %></span>
+          <span class="grow"><%= e.username %> <span class="muted">· <%= e.guild_name || 'Unbekannt' %></span></span>
+          <span class="muted small" title="<%= h.date(e.created_at) %>"><%= h.relative(e.created_at) %></span>
+        </li>
+      <% }) %>
+    </ul>
+  </section>
+</div>
+
+<%- include('partials/foot') %>

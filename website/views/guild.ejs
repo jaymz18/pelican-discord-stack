@@ -1,0 +1,62 @@
+<%- include('partials/head') %>
+
+<p><a href="/" class="muted">‹ Zurück zur Übersicht</a></p>
+
+<section class="hero card">
+  <% if (guild.icon_url) { %>
+    <img class="avatar lg" src="<%= guild.icon_url %>" alt="">
+  <% } else { %>
+    <span class="avatar lg placeholder"><%= h.initials(guild.name) %></span>
+  <% } %>
+  <div>
+    <h1><%= guild.name %></h1>
+    <span class="muted"><%= h.number(guild.member_count) %> Mitglieder · Bot seit <%= h.date(guild.joined_at) %></span>
+  </div>
+</section>
+
+<div class="grid wide-left">
+  <section class="card">
+    <h2>🏆 Leaderboard</h2>
+    <% if (!leaderboard.length) { %>
+      <p class="muted">Noch niemand hat XP gesammelt.</p>
+    <% } else { %>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Mitglied</th><th>Level</th><th class="hide-sm">Fortschritt</th><th class="num">XP</th><th class="num hide-sm">Nachrichten</th></tr>
+          </thead>
+          <tbody>
+            <% leaderboard.forEach((m, i) => { const lv = h.levelInfo(m.xp); %>
+              <tr>
+                <td class="rank r<%= i + 1 %>"><%= i + 1 %></td>
+                <td><span class="row"><img class="avatar sm" src="<%= h.avatar(m.avatar_url) %>" alt="" loading="lazy"> <%= m.username %></span></td>
+                <td><strong><%= lv.level %></strong></td>
+                <td class="hide-sm"><span class="bar" title="<%= lv.current %>/<%= lv.needed %> XP"><span style="width: <%= lv.percent %>%"></span></span></td>
+                <td class="num"><%= h.number(m.xp) %></td>
+                <td class="num hide-sm"><%= h.number(m.messages) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+
+  <section class="card">
+    <h2>Letzte Aktivität</h2>
+    <% if (!events.length) { %>
+      <p class="muted">Keine Join-/Leave-Events.</p>
+    <% } %>
+    <ul class="list compact">
+      <% events.forEach((e) => { %>
+        <li class="row">
+          <span class="badge <%= e.event %>"><%= e.event === 'join' ? 'Beitritt' : 'Verlassen' %></span>
+          <span class="grow"><%= e.username %></span>
+          <span class="muted small" title="<%= h.date(e.created_at) %>"><%= h.relative(e.created_at) %></span>
+        </li>
+      <% }) %>
+    </ul>
+  </section>
+</div>
+
+<%- include('partials/foot') %>

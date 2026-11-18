@@ -1,0 +1,162 @@
+{
+    "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PELICAN PANEL - PELICAN.DEV",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": "https://raw.githubusercontent.com/jaymz18/pelican-discord-stack/main/eggs/egg-website.json"
+    },
+    "exported_at": "2026-11-18T12:00:00+00:00",
+    "name": "Bot Website (Node.js)",
+    "author": "jaymz18@users.noreply.github.com",
+    "description": "Node.js/Express-Dashboard für den Discord-Bot: Statistiken, Server-Übersicht und Leaderboards aus der gemeinsamen MariaDB. Teil von pelican-discord-stack.",
+    "features": null,
+    "docker_images": {
+        "Node.js 24 (Website-Image)": "ghcr.io/jaymz18/pelican-discord-stack-website:latest"
+    },
+    "file_denylist": [],
+    "startup": "node {{MAIN_FILE}}",
+    "config": {
+        "files": "{}",
+        "startup": "{\"done\": \"Website listening on\"}",
+        "logs": "{}",
+        "stop": "^C"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/bash\n# Pelican Installationsskript – klont die Website aus dem GitHub-Repository\nset -e\napt-get update -qq\napt-get install -y -qq --no-install-recommends git ca-certificates > /dev/null\n\nmkdir -p /mnt/server\ncd /mnt/server\n\nGIT_BRANCH=${GIT_BRANCH:-main}\nGIT_SUBDIR=${GIT_SUBDIR:-website}\n\necho \"Klone ${GIT_REPO} (Branch: ${GIT_BRANCH}) ...\"\nrm -rf /tmp/src\ngit clone --depth 1 --branch \"${GIT_BRANCH}\" \"${GIT_REPO}\" /tmp/src\n\nif [ ! -d \"/tmp/src/${GIT_SUBDIR}\" ]; then\n    echo \"FEHLER: Unterordner '${GIT_SUBDIR}' existiert nicht im Repository.\"\n    exit 1\nfi\n\ncp -r \"/tmp/src/${GIT_SUBDIR}/.\" /mnt/server/\nrm -rf /tmp/src\n\nif [ ! -f /mnt/server/.env ] && [ -f /mnt/server/.env.example ]; then\n    echo \"Hinweis: Konfiguration erfolgt über die Pelican-Variablen, .env ist optional.\"\nfi\n\necho \"Installation abgeschlossen.\"\n",
+            "container": "debian:bookworm-slim",
+            "entrypoint": "bash"
+        }
+    },
+    "variables": [
+        {
+            "name": "Seitentitel",
+            "description": "Titel, der auf der Website angezeigt wird.",
+            "env_variable": "SITE_TITLE",
+            "default_value": "Discord Bot Dashboard",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:80",
+            "field_type": "text"
+        },
+        {
+            "name": "Bot-Einladungslink",
+            "description": "Optional: OAuth2-Link zum Einladen des Bots.",
+            "env_variable": "BOT_INVITE_URL",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:500",
+            "field_type": "text"
+        },
+        {
+            "name": "Zeitzone",
+            "description": "Zeitzone für Datumsanzeigen.",
+            "env_variable": "SITE_TIMEZONE",
+            "default_value": "Europe/Berlin",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:64",
+            "field_type": "text"
+        },
+        {
+            "name": "Startdatei",
+            "description": "JavaScript-Datei, die gestartet wird.",
+            "env_variable": "MAIN_FILE",
+            "default_value": "server.js",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:64",
+            "field_type": "text"
+        },
+        {
+            "name": "Datenbank Host",
+            "description": "Host/IP des MariaDB-Servers (Pelican: Database Host des Nodes, z. B. 172.18.0.1).",
+            "env_variable": "DB_HOST",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:255",
+            "field_type": "text"
+        },
+        {
+            "name": "Datenbank Port",
+            "description": "Port des MariaDB-Servers.",
+            "env_variable": "DB_PORT",
+            "default_value": "3306",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|between:1,65535",
+            "field_type": "text"
+        },
+        {
+            "name": "Datenbank Name",
+            "description": "Name der Datenbank (im Pelican-Tab 'Datenbanken' anlegen).",
+            "env_variable": "DB_DATABASE",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:100",
+            "field_type": "text"
+        },
+        {
+            "name": "Datenbank Benutzer",
+            "description": "Benutzername für die Datenbank.",
+            "env_variable": "DB_USERNAME",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:100",
+            "field_type": "text"
+        },
+        {
+            "name": "Datenbank Passwort",
+            "description": "Passwort für die Datenbank.",
+            "env_variable": "DB_PASSWORD",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:255",
+            "field_type": "text"
+        },
+        {
+            "name": "Git Repository",
+            "description": "Repository, aus dem installiert/aktualisiert wird.",
+            "env_variable": "GIT_REPO",
+            "default_value": "https://github.com/jaymz18/pelican-discord-stack.git",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:255",
+            "field_type": "text"
+        },
+        {
+            "name": "Git Branch",
+            "description": "Branch für Installation und Auto-Update.",
+            "env_variable": "GIT_BRANCH",
+            "default_value": "main",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:100",
+            "field_type": "text"
+        },
+        {
+            "name": "Git Unterordner",
+            "description": "Ordner im Repository, der auf den Server kopiert wird.",
+            "env_variable": "GIT_SUBDIR",
+            "default_value": "website",
+            "user_viewable": true,
+            "user_editable": false,
+            "rules": "required|string|max:100",
+            "field_type": "text"
+        },
+        {
+            "name": "Auto-Update",
+            "description": "1 = Beim Start den neuesten Code aus dem Repository holen (überschreibt geänderte Projektdateien).",
+            "env_variable": "AUTO_UPDATE",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        }
+    ]
+}

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %> · <%= siteTitle %></title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">
+      <img src="/favicon.svg" alt="" width="28" height="28">
+      <span><%= siteTitle %></span>
+    </a>
+    <nav>
+      <a href="/">Übersicht</a>
+      <a href="/api/stats">API</a>
+      <% if (inviteUrl) { %><a class="btn" href="<%= inviteUrl %>" target="_blank" rel="noopener">Bot einladen</a><% } %>
+    </nav>
+  </header>
+  <main class="container">
